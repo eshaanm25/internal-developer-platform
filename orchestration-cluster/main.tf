@@ -70,7 +70,7 @@ module "eks_blueprints_addons" {
   eks_oidc_provider_arn = module.eks.oidc_provider_arn
 
   enable_argocd = true
-  # This example shows how to set default ArgoCD Admin Password using SecretsManager with Helm Chart set_sensitive values.
+  # Set default ArgoCD Admin Password using SecretsManager with Helm Chart set_sensitive values.
   argocd_helm_config = {
     set_sensitive = [
       {
@@ -125,6 +125,31 @@ resource "aws_secretsmanager_secret" "argocd" {
 resource "aws_secretsmanager_secret_version" "argocd" {
   secret_id     = aws_secretsmanager_secret.argocd.id
   secret_string = random_password.argocd.result
+}
+
+################################################################################
+# Port Config
+################################################################################
+
+resource "helm_release" "port-config" {
+  name       = "port-k8s-exporter"
+  repository = "https://port-labs.github.io/helm-charts"
+  chart      = "port-k8s-exporter"
+  version    = "0.1.17"
+
+  values = [
+    "${file("port-config.yaml")}"
+  ]
+
+  set {
+    name  = "secret.secrets.portClientSecret"
+    value = var.port-client-secret
+  }
+
+  set {
+    name  = "secret.secrets.portClientId"
+    value = var.port-client-id
+  }
 }
 
 ################################################################################
