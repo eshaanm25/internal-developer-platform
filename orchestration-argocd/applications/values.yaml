@@ -4,8 +4,6 @@
 applications:
 - name: crossplane
   namespace: argocd
-  additionalLabels: {}
-  additionalAnnotations: {}
   finalizers:
   - resources-finalizer.argocd.argoproj.io
   project: default
@@ -19,6 +17,22 @@ applications:
   syncPolicy:
     syncOptions:
       - CreateNamespace=true
+    automated:
+      prune: false
+      selfHeal: false
+- name: argocd-ingress
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  project: default
+  source:
+    repoURL: 'https://github.com/eshaanm25/internal-developer-platform.git'
+    path: orchestration-argocd/resources/ingress
+    targetRevision: HEAD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
     automated:
       prune: false
       selfHeal: false
