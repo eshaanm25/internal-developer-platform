@@ -144,7 +144,7 @@ resource "helm_release" "port-config" {
   version    = "0.1.17"
 
   values = [
-    "${file("port-config.yaml")}"
+    "${file("assets/port-config.yaml")}"
   ]
 
   set {
