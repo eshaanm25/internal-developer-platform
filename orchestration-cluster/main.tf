@@ -72,6 +72,7 @@ module "eks_blueprints_addons" {
   enable_argocd = true
   # Set default ArgoCD Admin Password using SecretsManager with Helm Chart set_sensitive values.
   argocd_helm_config = {
+    version = "5.36.10"
     set_sensitive = [
       {
         name  = "configs.secret.argocdServerAdminPassword"
@@ -86,6 +87,11 @@ module "eks_blueprints_addons" {
       path               = "chart"
       repo_url           = "https://github.com/aws-samples/eks-blueprints-add-ons.git"
       add_on_application = true
+    }
+    workloads = {
+      path               = "orchestration-argocd/applications"
+      repo_url           = "https://github.com/eshaanm25/internal-developer-platform.git"
+      add_on_application = false
     }
   }
 
