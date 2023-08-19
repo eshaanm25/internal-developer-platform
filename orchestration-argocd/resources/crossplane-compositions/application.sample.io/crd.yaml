@@ -1,0 +1,67 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: compositeapplications.sample.io
+  labels:
+    idp: "true"
+  annotations: 
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  group: sample.io
+  names:
+    kind: CompositeApplication
+    plural: compositeapplications
+  claimNames:
+    kind: ApplicationClaim
+    plural: applicationclaims
+  versions:
+  - name: v1alpha1
+    served: true
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              image:
+                type: string
+                description: Application Image
+              id:
+                type: string
+                description: Name of application
+              parameters:
+                type: object
+                description: Parameters used to customize the cluster
+                properties:
+                  port:
+                    description: Container port to expose
+                    type: integer
+                    default: 80
+                  namespace:
+                    description: Namespace to deploy application
+                    type: string
+                required:
+                - port
+                - namespace
+            required:
+            - image
+            - id
+            - parameters
+          status:
+            type: object
+            properties:
+              applicationName:
+                description: The name of the application.
+                type: string
+              applicationStatus:
+                description: The status of the application.
+                type: string
+    additionalPrinterColumns:
+    - name: applicationName
+      type: string
+      jsonPath: ".status.applicationName"
+    - name: applicationStatus
+      type: string
+      jsonPath: ".status.applicationStatus"
