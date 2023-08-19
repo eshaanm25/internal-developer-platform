@@ -61,18 +61,20 @@ data "aws_eks_cluster_auth" "this" {
 module "eks_blueprints_addons" {
   # Users should pin the version to the latest available release
   # tflint-ignore: terraform_module_pinned_source
-  source = "github.com/aws-ia/terraform-aws-eks-blueprints//modules/kubernetes-addons?ref=v4.32.1"
+  source = "aws-ia/eks-blueprints-addons/aws"
+  version = "~> 1.0"
 
-  eks_cluster_id        = module.eks.cluster_name
-  eks_cluster_endpoint  = module.eks.cluster_endpoint
-  eks_cluster_version   = module.eks.cluster_version
-  eks_oidc_provider     = module.eks.oidc_provider
-  eks_oidc_provider_arn = module.eks.oidc_provider_arn
+  cluster_name      = module.eks.cluster_name
+  cluster_endpoint  = module.eks.cluster_endpoint
+  cluster_version   = module.eks.cluster_version
+  oidc_provider_arn = module.eks.oidc_provider_arn
 
   enable_argocd = true
-  # Set default ArgoCD Admin Password using SecretsManager with Helm Chart set_sensitive values.
-  argocd_helm_config = {
-    version = "5.36.10"
+
+  argocd = {
+    version = "5.43.3"
+
+    # Set default ArgoCD Admin Password using SecretsManager with Helm Chart set_sensitive values.
     set_sensitive = [
       {
         name  = "configs.secret.argocdServerAdminPassword"
@@ -81,27 +83,10 @@ module "eks_blueprints_addons" {
     ]
   }
 
-  argocd_manage_add_ons = true # Indicates that ArgoCD is responsible for managing/deploying add-ons
-  argocd_applications = {
-    addons = {
-      path               = "chart"
-      repo_url           = "https://github.com/aws-samples/eks-blueprints-add-ons.git"
-      add_on_application = true
-    }
-    workloads = {
-      path               = "orchestration-argocd/applications"
-      repo_url           = "https://github.com/eshaanm25/internal-developer-platform.git"
-      add_on_application = false
-    }
-  }
-
   # Add-ons
-  enable_amazon_eks_aws_ebs_csi_driver = true
   enable_aws_load_balancer_controller  = true
   enable_cert_manager                  = true
-  enable_karpenter                     = false
   enable_metrics_server                = true
-  enable_argo_rollouts                 = false
 
   tags = local.tags
 }
@@ -131,6 +116,25 @@ resource "aws_secretsmanager_secret" "argocd" {
 resource "aws_secretsmanager_secret_version" "argocd" {
   secret_id     = aws_secretsmanager_secret.argocd.id
   secret_string = random_password.argocd.result
+}
+
+################################################################################
+# Initial Argo Application
+################################################################################
+
+resource "helm_release" "argo-apps" {
+  name       = "argocd-apps"
+  repository = "https://argoproj.github.io/argo-helm"
+  chart      = "argocd-apps"
+
+  values = [
+    "${file("assets/argo-app.yaml")}"
+  ]
+
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
+
 }
 
 ################################################################################

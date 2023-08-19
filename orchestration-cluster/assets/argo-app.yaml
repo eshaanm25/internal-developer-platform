@@ -1,0 +1,21 @@
+applications:
+  - name: system-tools
+    namespace: argocd
+    additionalLabels: {}
+    additionalAnnotations: {}
+    finalizers:
+    - resources-finalizer.argocd.argoproj.io
+    project: default
+    source:
+      repoURL: https://github.com/eshaanm25/internal-developer-platform.git
+      targetRevision: HEAD
+      path: orchestration-argocd/applications
+      directory:
+        recurse: true
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: argocd
+    syncPolicy:
+      automated:
+        prune: false
+        selfHeal: false
