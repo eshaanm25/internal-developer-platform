@@ -1,0 +1,172 @@
+name: Application Onboarding
+on:
+  workflow_dispatch:
+    inputs:
+      application_name:
+        required: true
+        description: "application_name"
+        type: string
+      image:
+        required: true
+        description: "initial_image"
+        type: string
+      port:
+        required: true
+        description: "port"
+        type: string
+      port_payload:
+        required: true
+        description: Port's payload, including details for who triggered the action and
+          general context (blueprint, run id, etc...)
+        type: string
+jobs:
+  create-repository:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          mkdir -p ${{ runner.temp }}/repo/application
+          cp orchestration-argocd/templates/crossplane-application.yaml ${{ runner.temp }}/repo/application/application.yaml
+
+          cd ${{ runner.temp }}/repo
+
+          # Edit Crossplane Application Template
+          git init
+          yq --inplace ".metadata.namespace = \"${{ inputs.application_name }}\"" application/application.yaml
+          yq --inplace ".metadata.name = \"application-${{ inputs.application_name }}\"" application/application.yaml
+          yq --inplace ".spec.image = \"${{ inputs.image }}\"" application/application.yaml
+          yq --inplace ".spec.id = \"application-${{ inputs.application_name }}\"" application/application.yaml
+          yq --inplace ".spec.parameters.port = ${{ inputs.port }}" application/application.yaml
+          yq --inplace ".spec.parameters.namespace = \"${{ inputs.application_name }}\"" application/application.yaml
+          echo "## Application Repository for ${{ inputs.application_name }}" > README.md
+
+          # Create Repository
+          gh repo create idp-application-${{ inputs.application_name }} --public --source=. --remote=upstream
+          
+          # Push Configuration
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add -A
+          git commit -m "feat(bot): onboard application ${{ inputs.application_name }}"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GH_PAT }}
+          branch: main
+          directory: ${{ runner.temp }}/repo
+          repository: eshaanm25/idp-application-${{ inputs.application_name }}
+
+      - name: Create a log message
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          operation: PATCH_RUN
+          runId: ${{fromJson(inputs.port_payload).context.runId}}
+          logMessage: Repository Created - https://github.com/eshaanm25/idp-application-${{ inputs.application_name }}
+
+  create-app:
+    needs: create-repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+        
+      - name: Create Application and AppProject
+        run: |
+          
+          FILE_PATH=orchestration-argocd/applications/tenant-apps/${{ inputs.application_name }}
+
+          # Create Folder
+          mkdir -p $FILE_PATH
+
+          # Copy Application Template
+          cp orchestration-argocd/templates/application.yaml $FILE_PATH
+
+          # Edit Application Template
+          yq --inplace ".metadata.name = \"application-${{ inputs.application_name }}\"" $FILE_PATH/application.yaml
+          yq --inplace ".spec.source.repoURL = \"https://github.com/eshaanm25/idp-application-${{ inputs.application_name }}.git\"" $FILE_PATH/application.yaml
+          yq --inplace ".spec.source.path = \"application\"" $FILE_PATH/application.yaml
+          yq --inplace ".spec.destination.namespace = \"${{ inputs.application_name }}\"" $FILE_PATH/application.yaml
+          yq --inplace ".spec.project = \"application-${{ inputs.application_name }}\"" $FILE_PATH/application.yaml
+
+          # Copy Application Project Template
+          cp orchestration-argocd/templates/appProject.yaml $FILE_PATH
+
+          # Edit Application Project Template
+          yq --inplace ".metadata.name = \"application-${{ inputs.application_name }}\"" $FILE_PATH/appProject.yaml
+          yq --inplace ".spec.description = \"AppProject for application-${{ inputs.application_name }} application\"" $FILE_PATH/appProject.yaml
+          yq --inplace ".spec.destinations[0].namespace = \"${{ inputs.application_name }}\"" $FILE_PATH/appProject.yaml
+          yq --inplace ".spec.sourceRepos[0] = \"https://github.com/eshaanm25/idp-application-${{ inputs.application_name }}.git\"" $FILE_PATH/appProject.yaml
+          yq --inplace ".spec.roles[0].policies[0] = \"p, proj:application-${{ inputs.application_name }}:ReadOnly, applications, get, application-${{ inputs.application_name }}/*, allow\"" $FILE_PATH/appProject.yaml
+
+          # Add User
+          yq --inplace '.data += {"accounts.application-${{ inputs.application_name }}":"apiKey, login"}' orchestration-argocd/system-resources/argocd-config/argocd-cm.yaml
+          
+          # Add Role to User
+          yq --inplace '.data."policy.csv" += "g, application-${{ inputs.application_name }}, proj:application-${{ inputs.application_name }}:ReadOnly "' orchestration-argocd/system-resources/argocd-config/argocd-rbac-cm.yaml
+
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add -A
+          git commit -m "feat(bot): onboard application ${{ inputs.application_name }}"
+    
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}
+
+      - name: Create a log message
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          operation: PATCH_RUN
+          runId: ${{fromJson(inputs.port_payload).context.runId}}
+          logMessage: Application Creation Succeeded.
+
+  set-password:
+    needs: create-app
+    runs-on: ubuntu-latest
+    steps:
+      - run: sleep 10
+        shell: bash
+
+      - shell: bash
+        id: password
+        run: |
+          echo "password=$(openssl rand -base64 14)" >> "$GITHUB_OUTPUT"
+
+      - shell: bash
+        id: add-password
+        run: |
+          docker run --rm \
+          argoproj/argocd:v2.6.14 \
+          sh -c '/usr/local/bin/argocd login \
+          --insecure \
+          k8s-argocd-argocdnl-fb7d1cecc9-9be4a7533103327e.elb.us-east-1.amazonaws.com \
+          --username="admin" \
+          --password="${{ secrets.ARGO_PASSWORD }}" && \
+          /usr/local/bin/argocd account update-password \
+          --account="application-${{ inputs.application_name }}" \
+          --new-password="${{ steps.password.outputs.password }}" \
+          --current-password="${{ secrets.ARGO_PASSWORD }}"'
+      
+      - name: Create a log message
+        uses: port-labs/port-github-action@v1
+        with:
+          clientId: ${{ secrets.PORT_CLIENT_ID }}
+          clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+          operation: PATCH_RUN
+          runId: ${{fromJson(inputs.port_payload).context.runId}}
+          logMessage: "Endpoint: k8s-argocd-argocdnl-fb7d1cecc9-9be4a7533103327e.elb.us-east-1.amazonaws.com Username: application-${{ inputs.application_name }} Password: ${{ steps.password.outputs.password }}"

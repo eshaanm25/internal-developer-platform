@@ -1,0 +1,11 @@
+apiVersion: sample.io/v1alpha1
+kind: ApplicationClaim
+metadata:
+  name: test-guestbook
+  namespace: default
+spec:
+  image: gcr.io/heptio-images/ks-guestbook-demo:0.2
+  id: guestbook-sample
+  parameters: 
+    port: 80
+    namespace: default

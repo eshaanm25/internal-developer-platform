@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: application-hello
+  namespace: argocd
+spec:
+  clusterResourceBlacklist:
+    - group: ''
+      kind: ''
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: sample.io
+      kind: CompositeApplication
+    - group: kubernetes.crossplane.io
+      kind: Object
+    - group: kubernetes.crossplane.io
+      kind: ProviderConfig
+    - group: kubernetes.crossplane.io
+      kind: ProviderConfigUsage
+  description: test
+  destinations:
+  - name: in-cluster
+    namespace: hello
+    server: https://kubernetes.default.svc
+  namespaceResourceBlacklist:
+    - group: ''
+      kind: ''
+  namespaceResourceWhitelist:
+    - group: sample.io
+      kind: ApplicationClaim
+  roles:
+  - description: Read Only Access to Application
+    name: ReadOnly
+    policies:
+    - p, proj:application-hello:ReadOnly, applications, get, application-hello/*, allow
+  sourceRepos:
+  - https://github.com/eshaanm25/idp-application-hello.git

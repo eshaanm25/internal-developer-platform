@@ -3,9 +3,6 @@ kind: ApplicationClaim
 metadata:
   name: test-guestbook
   namespace: default
-  annotations: 
-    argocd.argoproj.io/sync-wave: "3"
-    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   image: gcr.io/heptio-images/ks-guestbook-demo:0.2
   id: guestbook-sample

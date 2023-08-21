@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    path: orchestration-argocd/resources/ingress
+    path: orchestration-argocd/system-resources/ingress
     repoURL: https://github.com/eshaanm25/internal-developer-platform.git
     targetRevision: HEAD
   destination:
