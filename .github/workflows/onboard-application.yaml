@@ -154,7 +154,7 @@ jobs:
           argoproj/argocd:v2.6.14 \
           sh -c '/usr/local/bin/argocd login \
           --insecure \
-          k8s-argocd-argocdnl-fb7d1cecc9-9be4a7533103327e.elb.us-east-1.amazonaws.com \
+          ${{ secrets.ARGO_ENDPOINT }} \
           --username="admin" \
           --password="${{ secrets.ARGO_PASSWORD }}" && \
           /usr/local/bin/argocd account update-password \
@@ -169,4 +169,4 @@ jobs:
           clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
           operation: PATCH_RUN
           runId: ${{fromJson(inputs.port_payload).context.runId}}
-          logMessage: "Endpoint: k8s-argocd-argocdnl-fb7d1cecc9-9be4a7533103327e.elb.us-east-1.amazonaws.com Username: application-${{ inputs.application_name }} Password: ${{ steps.password.outputs.password }}"
+          logMessage: "Endpoint: ${{ secrets.ARGO_ENDPOINT }} Username: application-${{ inputs.application_name }} Password: ${{ steps.password.outputs.password }}"

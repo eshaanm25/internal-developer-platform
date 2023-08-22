@@ -2,7 +2,7 @@ resource "port_blueprint" "environment" {
   provider = port-labs
   title      = "test-environment"
   icon       = "Environment"
-  identifier = "eshaan-env-test"
+  identifier = "eshaan-env-one-test"
   properties = {
     string_props = {
       "name" = {
